@@ -21,6 +21,7 @@ RoutePlanner::RoutePlanner(RouteModel &model, float start_x, float start_y, floa
 // - Node objects have a distance method to determine the distance to another node.
 
 float RoutePlanner::CalculateHValue(RouteModel::Node const *node) {
+    
     return node->distance(*end_node);
 }
 
@@ -36,12 +37,12 @@ void RoutePlanner::AddNeighbors(RouteModel::Node *current_node) {
     current_node->FindNeighbors();
 
     for(auto *n : current_node->neighbors) {
-        n->g_value = current_node->g_value + current_node->distance(*n);
+        n->g_value = current_node->g_value + n->distance(*current_node);
         n->parent = current_node;
         n->h_value = CalculateHValue(n);
-
-        open_list.push_back(n);
         n->visited = true;
+        
+        open_list.push_back(n);  
     }
 }
 
@@ -54,14 +55,14 @@ void RoutePlanner::AddNeighbors(RouteModel::Node *current_node) {
 // - Return the pointer.
 
 bool myCompr(RouteModel::Node *na, RouteModel::Node *nb) {
-    return (na->g_value + na->h_value) < (nb->g_value + nb->h_value);
+    return (na->g_value + na->h_value) > (nb->g_value + nb->h_value);
 }
 
 RouteModel::Node *RoutePlanner::NextNode() {
     sort(open_list.begin(), open_list.end(), myCompr);
     
-    RouteModel::Node *optNode = open_list.front();
-    open_list.erase(open_list.begin());
+    RouteModel::Node *optNode = open_list.back();
+    open_list.pop_back();
     
     return optNode;
 }
@@ -89,10 +90,12 @@ std::vector<RouteModel::Node> RoutePlanner::ConstructFinalPath(RouteModel::Node 
 
         current_node = parent;
     }
-
-    distance *= m_Model.MetricScale(); // Multiply the distance by the scale of the map to get meters.
+    path_found.push_back(*current_node);
+    reverse(path_found.begin(), path_found.end());
+  
+    distance *= m_Model.MetricScale(); // Multiply the distance by the scale of the map to get meters.  
+    
     return path_found;
-
 }
 
 
@@ -108,15 +111,14 @@ void RoutePlanner::AStarSearch() {
     
     // TODO: Implement your solution here.
     start_node->visited = true;
-    open_list.push_back(start_node);
-    
-    while (open_list.size() > 0) {
-        current_node = NextNode();
-        if (current_node->distance(*end_node) == 0) {
-            m_Model.path = ConstructFinalPath(current_node);
-            return;
-        }
+    current_node = start_node;
 
+    open_list.push_back(current_node);
+    
+    while (current_node != end_node && open_list.size() > 0) {
         AddNeighbors(current_node);
+        current_node = NextNode();
     }
+  
+    m_Model.path = ConstructFinalPath(current_node);
 }
